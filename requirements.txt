@@ -1,0 +1,10 @@
+pandas
+torch
+pytorch-lightning>=1.5.10
+torchvision
+albumentations
+argh
+matplotlib
+git+https://github.com/qubvel/segmentation_models.pytorch
+git+https://github.com/Project-MONAI/MONAI#egg=monai
+jsonargparse[signatures]

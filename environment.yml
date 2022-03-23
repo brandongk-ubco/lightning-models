@@ -1,0 +1,11 @@
+name: lightningmodels
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.8
+  - pytorch
+  - pip
+  - pip:
+    - -r requirements.txt
+    - -r requirements-dev.txt
