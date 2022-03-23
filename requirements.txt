@@ -5,6 +5,6 @@ torchvision
 albumentations
 argh
 matplotlib
-git+https://github.com/qubvel/segmentation_models.pytorch
-git+https://github.com/Project-MONAI/MONAI#egg=monai
+segmentation_models_pytorch@https://github.com/qubvel/segmentation_models.pytorch/archive/refs/heads/master.zip
+monai@https://github.com/Project-MONAI/MONAI/archive/refs/heads/master.zip
 jsonargparse[signatures]
