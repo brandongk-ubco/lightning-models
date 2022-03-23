@@ -9,6 +9,8 @@ from ...helpers.classwise import classwise
 from ...losses.FocalLoss import FocalLoss
 from ...losses.TverskyLoss import TverskyLoss
 
+__all__ = ["Segmenter"]
+
 
 @MODEL_REGISTRY
 class Segmenter(LightningModule):

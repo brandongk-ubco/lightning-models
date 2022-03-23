@@ -6,6 +6,8 @@ import monai
 import torchmetrics
 from pytorch_lightning.utilities.cli import MODEL_REGISTRY
 
+__all__ = ["Classifier"]
+
 
 @MODEL_REGISTRY
 class Classifier(LightningModule):
