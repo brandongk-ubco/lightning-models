@@ -1,3 +1,3 @@
-from lightningmodels import vision
+from . import vision
 
 __all__ = ["vision"]
