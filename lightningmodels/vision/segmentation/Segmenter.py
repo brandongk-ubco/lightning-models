@@ -15,17 +15,16 @@ __all__ = ["Segmenter"]
 @MODEL_REGISTRY
 class Segmenter(LightningModule):
 
-    def __init__(
-        self,
-        num_classes: int,
-        in_channels: int,
-        patience: int = 5,
-        learning_rate: float = 5e-3,
-        min_learning_rate: float = 5e-4,
-        weight_decay: float = 0.0,
-        focal_loss_multiplier: float = 1.0,
-        tversky_loss_multiplier: float = 1.0,
-    ):
+    def __init__(self,
+                 num_classes: int,
+                 in_channels: int,
+                 patience: int = 5,
+                 learning_rate: float = 5e-3,
+                 min_learning_rate: float = 5e-4,
+                 weight_decay: float = 0.0,
+                 focal_loss_multiplier: float = 1.0,
+                 tversky_loss_multiplier: float = 1.0,
+                 dataset: str = None):
         super().__init__()
         self.save_hyperparameters()
 
@@ -35,12 +34,18 @@ class Segmenter(LightningModule):
             torch.nn.Conv2d(self.hparams.in_channels, 3, (1, 1)),
             torch.nn.InstanceNorm2d(3), self.get_model(), torch.nn.Sigmoid())
 
-        self.train_iou = torchmetrics.JaccardIndex(self.hparams.num_classes,
-                                                   absent_score=1.0)
-        self.valid_iou = torchmetrics.JaccardIndex(self.hparams.num_classes,
-                                                   absent_score=1.0)
-        self.test_iou = torchmetrics.JaccardIndex(self.hparams.num_classes,
-                                                  absent_score=1.0)
+        self.train_f1 = torchmetrics.F1Score(self.hparams.num_classes + 1,
+                                             average="weighted",
+                                             mdmc_average="samplewise",
+                                             ignore_index=0)
+        self.valid_f1 = torchmetrics.F1Score(self.hparams.num_classes + 1,
+                                             average="weighted",
+                                             mdmc_average="samplewise",
+                                             ignore_index=0)
+        self.test_f1 = torchmetrics.F1Score(self.hparams.num_classes + 1,
+                                            average="weighted",
+                                            mdmc_average="samplewise",
+                                            ignore_index=0)
 
     def configure_callbacks(self):
         callbacks = [
@@ -95,11 +100,17 @@ class Segmenter(LightningModule):
         x, y = batch
         y_hat = self(x)
 
-        torch.use_deterministic_algorithms(False)
-        self.train_iou(torch.round(y_hat).int(), torch.round(y).int())
-        torch.use_deterministic_algorithms(True)
-        self.log('train_iou',
-                 self.train_iou,
+        background = torch.ones(
+            [y_hat.size(dim=0), 1,
+             y_hat.size(dim=2),
+             y_hat.size(dim=3)],
+            dtype=y_hat.dtype,
+            device=y_hat.device) * 0.5
+        self.train_f1(
+            torch.concat([background, y_hat], dim=1).argmax(dim=1),
+            torch.concat([background, y], dim=1).argmax(dim=1))
+        self.log('train_f1',
+                 self.train_f1,
                  on_step=True,
                  on_epoch=False,
                  prog_bar=True)
@@ -114,11 +125,17 @@ class Segmenter(LightningModule):
 
         y_hat = self(x)
 
-        torch.use_deterministic_algorithms(False)
-        self.valid_iou(torch.round(y_hat).int(), torch.round(y).int())
-        torch.use_deterministic_algorithms(True)
-        self.log('valid_iou',
-                 self.valid_iou,
+        background = torch.ones(
+            [y_hat.size(dim=0), 1,
+             y_hat.size(dim=2),
+             y_hat.size(dim=3)],
+            dtype=y_hat.dtype,
+            device=y_hat.device) * 0.5
+        self.valid_f1(
+            torch.concat([background, y_hat], dim=1).argmax(dim=1),
+            torch.concat([background, y], dim=1).argmax(dim=1))
+        self.log('valid_f1',
+                 self.valid_f1,
                  on_step=False,
                  on_epoch=True,
                  prog_bar=True)
@@ -130,11 +147,18 @@ class Segmenter(LightningModule):
         x, y = batch
         y_hat = self(x)
 
-        torch.use_deterministic_algorithms(False)
-        self.test_iou(torch.round(y_hat).int(), torch.round(y).int())
-        torch.use_deterministic_algorithms(True)
-        self.log('test_iou',
-                 self.test_iou,
+        background = torch.ones(
+            [y_hat.size(dim=0), 1,
+             y_hat.size(dim=2),
+             y_hat.size(dim=3)],
+            dtype=y_hat.dtype,
+            device=y_hat.device) * 0.5
+        self.test_f1(
+            torch.concat([background, y_hat], dim=1).argmax(dim=1),
+            torch.concat([background, y], dim=1).argmax(dim=1))
+
+        self.log('test_f1',
+                 self.test_f1,
                  on_step=False,
                  on_epoch=True,
                  prog_bar=True)

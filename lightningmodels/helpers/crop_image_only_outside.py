@@ -8,4 +8,3 @@ def crop_image_only_outside(img, tol=0):
     col_start, col_end = mask0.argmax(), n - mask0[::-1].argmax()
     row_start, row_end = mask1.argmax(), m - mask1[::-1].argmax()
     return row_start, row_end, col_start, col_end
-
