@@ -35,9 +35,9 @@ class Classifier(LightningModule):
         self.valid_acc = torchmetrics.Accuracy()
         self.test_acc = torchmetrics.Accuracy()
         
-        self.train_f1 = F1Score(num_classes=num_classes)
-        self.valid_f1 = F1Score(num_classes=num_classes)
-        self.test_f1 = F1Score(num_classes=num_classes)
+        self.train_f1 = torchmetrics.F1Score(num_classes=num_classes)
+        self.valid_f1 = torchmetrics.F1Score(num_classes=num_classes)
+        self.test_f1 = torchmetrics.F1Score(num_classes=num_classes)
 
     def configure_callbacks(self):
         callbacks = [
