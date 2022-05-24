@@ -18,6 +18,9 @@ class MyLightningCLI(LightningCLI):
         parser.link_arguments("data.name",
                               "model.dataset",
                               apply_on="instantiate")
+        parser.link_arguments("data.classes",
+                              "model.classes",
+                              apply_on="instantiate")
 
 
 CLI = partial(MyLightningCLI,
