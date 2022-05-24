@@ -24,8 +24,9 @@ class ClassifierPredictionWriter(BasePredictionWriter):
         self, trainer, pl_module: 'LightningModule', prediction: Any, batch_indices: List[int], batch: Any,
         batch_idx: int, dataloader_idx: int
     ):
-        predicted = prediction.argmax()
-        ground_truth = batch[1].argmax()
+
+        predicted = prediction["predicted"]
+        ground_truth = prediction["ground_truth"]
         if self.classes is not None:
             predicted = self.classes[predicted]
             ground_truth = self.classes[ground_truth]
@@ -53,7 +54,7 @@ class Classifier(LightningModule):
             torch.nn.InstanceNorm2d(self.hparams.in_channels,
                                     track_running_stats=True),
             torch.nn.Conv2d(self.hparams.in_channels, 3, (1, 1)),
-            torch.nn.InstanceNorm2d(3), self.get_model(), torch.nn.Sigmoid())
+            torch.nn.InstanceNorm2d(3), self.get_model())
 
         self.loss = torch.nn.BCELoss()
 
@@ -82,15 +83,27 @@ class Classifier(LightningModule):
         return callbacks
 
     def get_model(self):
-        return monai.networks.nets.EfficientNetBN(
-            "efficientnet-b0",
-            spatial_dims=2,
-            pretrained=True,
-            num_classes=self.hparams.num_classes)
+        width = 60
+        depth = 6
+        channels = [width] * depth
+
+        return monai.networks.nets.UNet(
+            dimensions=2,
+            in_channels=3,
+            out_channels=self.hparams.num_classes,
+            strides = [2] * depth,
+            channels = channels,
+            num_res_units = 2,
+            norm=monai.networks.layers.factories.Norm.BATCH,
+            act=monai.networks.layers.factories.Act.LEAKYRELU)
+
 
     def training_step(self, batch, _batch_idx):
         x, y = batch
         y_hat = self(x)
+
+        import pdb
+        pdb.set_trace()
 
         self.train_acc(torch.round(y_hat).int(), torch.round(y).int())
         self.log('train_acc',
@@ -99,6 +112,7 @@ class Classifier(LightningModule):
                  on_epoch=False,
                  prog_bar=True)
         
+
         
         return self.loss(y_hat, y)
 
@@ -136,7 +150,12 @@ class Classifier(LightningModule):
 
     def predict_step(self, batch, _batch_idx):
         x, y = batch
-        return self(x)
+        y_hat = self(x)
+        predicted = y_hat.squeeze().argmax()
+        ground_truth = batch[1].squeeze().argmax()
+        import pdb
+        pdb.set_trace()
+        return {"predicted": predicted, "ground_truth": ground_truth}
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(),
