@@ -35,17 +35,14 @@ class Segmenter(LightningModule):
             torch.nn.InstanceNorm2d(3), self.get_model(), torch.nn.Sigmoid())
 
         self.train_f1 = torchmetrics.F1Score(self.hparams.num_classes + 1,
-                                             average="weighted",
-                                             mdmc_average="samplewise",
-                                             ignore_index=0)
+                                             average="macro",
+                                             mdmc_average='global')
         self.valid_f1 = torchmetrics.F1Score(self.hparams.num_classes + 1,
-                                             average="weighted",
-                                             mdmc_average="samplewise",
-                                             ignore_index=0)
+                                             average="macro",
+                                             mdmc_average='samplewise')
         self.test_f1 = torchmetrics.F1Score(self.hparams.num_classes + 1,
-                                            average="weighted",
-                                            mdmc_average="samplewise",
-                                            ignore_index=0)
+                                            average="macro",
+                                            mdmc_average='samplewise')
 
     def configure_callbacks(self):
         callbacks = [
