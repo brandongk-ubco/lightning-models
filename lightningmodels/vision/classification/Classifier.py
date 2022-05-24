@@ -5,8 +5,33 @@ from pytorch_lightning.utilities.exceptions import MisconfigurationException
 import monai
 import torchmetrics
 from pytorch_lightning.utilities.cli import MODEL_REGISTRY
+from typing import List, Any
+from pytorch_lightning.callbacks import BasePredictionWriter
+import os
 
 __all__ = ["Classifier"]
+
+class ClassifierPredictionWriter(BasePredictionWriter):
+    def __init__(self, output_dir: str, write_interval: str, classes: List[Any] = None):
+        super().__init__(write_interval)
+        self.output_dir = output_dir
+        self.output_file = os.path.join(output_dir, "predictions.csv")
+        self.classes = classes
+        with open(self.output_file, "w", encoding='utf8') as f:
+            f.write("batch_idx,ground_truth,predicted\n")
+
+    def write_on_batch_end(
+        self, trainer, pl_module: 'LightningModule', prediction: Any, batch_indices: List[int], batch: Any,
+        batch_idx: int, dataloader_idx: int
+    ):
+        predicted = prediction.argmax()
+        ground_truth = batch[1].argmax()
+        if self.classes is not None:
+            predicted = self.classes[predicted]
+            ground_truth = self.classes[ground_truth]
+        with open(self.output_file, "a", encoding='utf8') as f:
+            f.write(f"{batch_idx},{ground_truth},{predicted}\n")
+
 
 
 @MODEL_REGISTRY
@@ -14,6 +39,7 @@ class Classifier(LightningModule):
 
     def __init__(self,
                  num_classes: int,
+                 classes: List,
                  in_channels: int,
                  patience: int = 3,
                  learning_rate: float = 5e-3,
@@ -46,6 +72,7 @@ class Classifier(LightningModule):
                             save_top_k=1,
                             mode="min",
                             filename='{epoch}-{val_loss:.6f}'),
+            ClassifierPredictionWriter(os.getcwd(), write_interval="batch", classes=self.hparams.classes)
         ]
 
         try:
@@ -106,6 +133,10 @@ class Classifier(LightningModule):
 
         loss = self.loss(y_hat, y)
         self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
+
+    def predict_step(self, batch, _batch_idx):
+        x, y = batch
+        return self(x)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(),
