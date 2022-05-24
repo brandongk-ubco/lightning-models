@@ -59,4 +59,4 @@ def execute():
     )
 
 
-__all__ = ["vision", "CLI"]
+__all__ = ["vision", "CLI", "execute"]
