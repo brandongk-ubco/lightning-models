@@ -34,10 +34,6 @@ class Classifier(LightningModule):
         self.train_acc = torchmetrics.Accuracy()
         self.valid_acc = torchmetrics.Accuracy()
         self.test_acc = torchmetrics.Accuracy()
-        
-        self.train_f1 = torchmetrics.F1Score(num_classes=num_classes)
-        self.valid_f1 = torchmetrics.F1Score(num_classes=num_classes)
-        self.test_f1 = torchmetrics.F1Score(num_classes=num_classes)
 
     def configure_callbacks(self):
         callbacks = [
@@ -70,14 +66,8 @@ class Classifier(LightningModule):
         y_hat = self(x)
 
         self.train_acc(torch.round(y_hat).int(), torch.round(y).int())
-        self.train_f1(torch.round(y_hat).int(), torch.round(y).int())
         self.log('train_acc',
                  self.train_acc,
-                 on_step=True,
-                 on_epoch=False,
-                 prog_bar=True)
-        self.log('train_f1',
-                 self.train_f1,
                  on_step=True,
                  on_epoch=False,
                  prog_bar=True)
@@ -93,14 +83,8 @@ class Classifier(LightningModule):
         y_hat = self(x)
 
         self.valid_acc(torch.round(y_hat).int(), torch.round(y).int())
-        self.valid_f1(torch.round(y_hat).int(), torch.round(y).int())
         self.log('valid_acc',
                  self.valid_acc,
-                 on_step=False,
-                 on_epoch=True,
-                 prog_bar=True)
-        self.log('valid_f1',
-                 self.valid_f1,
                  on_step=False,
                  on_epoch=True,
                  prog_bar=True)
@@ -114,18 +98,12 @@ class Classifier(LightningModule):
         y_hat = self(x)
 
         self.test_acc(torch.round(y_hat).int(), torch.round(y).int())
-        self.test_f1(torch.round(y_hat).int(), torch.round(y).int())
         self.log('test_acc',
                  self.test_acc,
                  on_step=False,
                  on_epoch=True,
                  prog_bar=True)
-        self.log('test_f1',
-                 self.test_f1,
-                 on_step=False,
-                 on_epoch=True,
-                 prog_bar=True)
-        
+
         loss = self.loss(y_hat, y)
         self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
 
