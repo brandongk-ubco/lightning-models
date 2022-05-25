@@ -8,6 +8,7 @@ from pytorch_lightning.utilities.cli import MODEL_REGISTRY
 from ...helpers.classwise import classwise
 from ...losses.FocalLoss import FocalLoss
 from ...losses.TverskyLoss import TverskyLoss
+from typing import List, Any
 
 __all__ = ["Segmenter"]
 
@@ -17,6 +18,7 @@ class Segmenter(LightningModule):
 
     def __init__(self,
                  num_classes: int,
+                 classes: List[Any],
                  in_channels: int,
                  patience: int = 5,
                  learning_rate: float = 5e-3,

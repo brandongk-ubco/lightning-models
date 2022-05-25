@@ -42,7 +42,7 @@ positional arguments:
 """
 
 
-def execute():
+def trainer():
     if len(sys.argv) < 4:
         print(usage)
         sys.exit(1)
