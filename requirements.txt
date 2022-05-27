@@ -9,3 +9,4 @@ segmentation_models_pytorch@https://github.com/qubvel/segmentation_models.pytorc
 monai@https://github.com/Project-MONAI/MONAI/archive/refs/heads/master.zip
 lightningdata@https://github.com/brandongk-ubco/lightning-data/archive/refs/heads/master.zip
 jsonargparse[signatures]
+pefile

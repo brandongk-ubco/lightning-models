@@ -8,12 +8,13 @@ from lightningmodels import trainer
 import sys
 
 if __name__ == "__main__":
-    datasets_file = os.path.join(os.getcwd(), "models.json")
-    if os.path.exists(datasets_file):
-        with open(datasets_file, "r") as jsonfile:
-            datasets = json.load(jsonfile)
-        for module in datasets:
-            importlib.import_module(module)
+    modules_file = os.path.join(os.getcwd(), "modules.json")
+    if os.path.exists(modules_file):
+        with open(modules_file, "r") as jsonfile:
+            modules = json.load(jsonfile)
+        if "models" in modules:
+            for module in modules["models"]:
+                importlib.import_module(module)
 
     if len(sys.argv) > 1 and sys.argv[1] == "trainer":
         sys.argv.pop(1)
