@@ -11,8 +11,13 @@ import os
 
 __all__ = ["Classifier"]
 
+
 class ClassifierPredictionWriter(BasePredictionWriter):
-    def __init__(self, output_dir: str, write_interval: str, classes: List[Any] = None):
+
+    def __init__(self,
+                 output_dir: str,
+                 write_interval: str,
+                 classes: List[Any] = None):
         super().__init__(write_interval)
         self.output_dir = output_dir
         self.output_file = os.path.join(output_dir, "predictions.csv")
@@ -20,10 +25,9 @@ class ClassifierPredictionWriter(BasePredictionWriter):
         with open(self.output_file, "w", encoding='utf8') as f:
             f.write("batch_idx,ground_truth,predicted\n")
 
-    def write_on_batch_end(
-        self, trainer, pl_module: 'LightningModule', prediction: Any, batch_indices: List[int], batch: Any,
-        batch_idx: int, dataloader_idx: int
-    ):
+    def write_on_batch_end(self, trainer, pl_module: 'LightningModule',
+                           prediction: Any, batch_indices: List[int],
+                           batch: Any, batch_idx: int, dataloader_idx: int):
 
         predicted = prediction["predicted"]
         ground_truth = prediction["ground_truth"]
@@ -32,7 +36,6 @@ class ClassifierPredictionWriter(BasePredictionWriter):
             ground_truth = self.classes[ground_truth]
         with open(self.output_file, "a", encoding='utf8') as f:
             f.write(f"{batch_idx},{ground_truth},{predicted}\n")
-
 
 
 @MODEL_REGISTRY
@@ -46,7 +49,7 @@ class Classifier(LightningModule):
                  learning_rate: float = 5e-3,
                  min_learning_rate: float = 5e-4,
                  weight_decay: float = 0.0,
-                 dataset: str = None):
+                 dataset_name: str = None):
         super().__init__()
         self.save_hyperparameters()
 
@@ -54,7 +57,8 @@ class Classifier(LightningModule):
             torch.nn.InstanceNorm2d(self.hparams.in_channels,
                                     track_running_stats=True),
             torch.nn.Conv2d(self.hparams.in_channels, 3, (1, 1)),
-            torch.nn.InstanceNorm2d(3), self.get_model())
+            torch.nn.InstanceNorm2d(3), self.get_model(),
+            torch.nn.Softmax(dim=1))
 
         self.loss = torch.nn.BCELoss()
 
@@ -73,7 +77,9 @@ class Classifier(LightningModule):
                             save_top_k=1,
                             mode="min",
                             filename='{epoch}-{val_loss:.6f}'),
-            ClassifierPredictionWriter(os.getcwd(), write_interval="batch", classes=self.hparams.classes)
+            ClassifierPredictionWriter(os.getcwd(),
+                                       write_interval="batch",
+                                       classes=self.hparams.classes)
         ]
 
         try:
@@ -83,27 +89,15 @@ class Classifier(LightningModule):
         return callbacks
 
     def get_model(self):
-        width = 60
-        depth = 6
-        channels = [width] * depth
-
-        return monai.networks.nets.UNet(
-            dimensions=2,
-            in_channels=3,
-            out_channels=self.hparams.num_classes,
-            strides = [2] * depth,
-            channels = channels,
-            num_res_units = 2,
-            norm=monai.networks.layers.factories.Norm.BATCH,
-            act=monai.networks.layers.factories.Act.LEAKYRELU)
-
+        return monai.networks.nets.EfficientNetBN(
+            "efficientnet-b0",
+            spatial_dims=2,
+            pretrained=True,
+            num_classes=self.hparams.num_classes)
 
     def training_step(self, batch, _batch_idx):
         x, y = batch
         y_hat = self(x)
-
-        import pdb
-        pdb.set_trace()
 
         self.train_acc(torch.round(y_hat).int(), torch.round(y).int())
         self.log('train_acc',
@@ -111,9 +105,7 @@ class Classifier(LightningModule):
                  on_step=True,
                  on_epoch=False,
                  prog_bar=True)
-        
 
-        
         return self.loss(y_hat, y)
 
     def forward(self, x):
@@ -129,8 +121,7 @@ class Classifier(LightningModule):
                  on_step=False,
                  on_epoch=True,
                  prog_bar=True)
-        
-        
+
         loss = self.loss(y_hat, y)
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
 

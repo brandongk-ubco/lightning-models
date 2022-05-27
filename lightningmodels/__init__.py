@@ -15,8 +15,8 @@ class MyLightningCLI(LightningCLI):
         parser.link_arguments("data.in_channels",
                               "model.in_channels",
                               apply_on="instantiate")
-        parser.link_arguments("data.name",
-                              "model.dataset",
+        parser.link_arguments("data.dataset_name",
+                              "model.dataset_name",
                               apply_on="instantiate")
         parser.link_arguments("data.classes",
                               "model.classes",
@@ -46,19 +46,19 @@ def trainer():
     if len(sys.argv) < 4:
         print(usage)
         sys.exit(1)
-    dataset = sys.argv.pop(2)
+    dataset_name = sys.argv.pop(2)
     model = sys.argv.pop(2)
     if model not in MODEL_REGISTRY:
         raise ValueError(
             f"Couldn't find model {model} in {', '.join(MODEL_REGISTRY.keys())}"
         )
-    if dataset not in DATAMODULE_REGISTRY:
+    if dataset_name not in DATAMODULE_REGISTRY:
         raise ValueError(
-            f"Couldn't find dataset {dataset} in {', '.join(DATAMODULE_REGISTRY.keys())}"
+            f"Couldn't find dataset {dataset_name} in {', '.join(DATAMODULE_REGISTRY.keys())}"
         )
     CLI(
         MODEL_REGISTRY[model],
-        DATAMODULE_REGISTRY[dataset],
+        DATAMODULE_REGISTRY[dataset_name],
     )
 
 

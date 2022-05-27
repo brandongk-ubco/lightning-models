@@ -26,7 +26,7 @@ class Segmenter(LightningModule):
                  weight_decay: float = 0.0,
                  focal_loss_multiplier: float = 1.0,
                  tversky_loss_multiplier: float = 1.0,
-                 dataset: str = None):
+                 dataset_name: str = None):
         super().__init__()
         self.save_hyperparameters()
 
