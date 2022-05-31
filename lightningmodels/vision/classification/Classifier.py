@@ -58,18 +58,26 @@ class Classifier(LightningModule):
                                     track_running_stats=True),
             torch.nn.Conv2d(self.hparams.in_channels, 3, (1, 1)),
             torch.nn.InstanceNorm2d(3), self.get_model(),
-            torch.nn.Softmax(dim=1))
+            self.get_final_activation())
 
         self.loss = torch.nn.BCELoss()
 
-        self.train_acc = torchmetrics.Accuracy()
-        self.valid_acc = torchmetrics.Accuracy()
-        self.test_acc = torchmetrics.Accuracy()
+        self.train_acc = torchmetrics.Accuracy(num_classes=num_classes)
+        self.valid_acc = torchmetrics.Accuracy(num_classes=num_classes)
+        self.test_acc = torchmetrics.Accuracy(num_classes=num_classes)
+
+        self.train_f1 = torchmetrics.F1Score(num_classes=num_classes)
+        self.valid_f1 = torchmetrics.F1Score(num_classes=num_classes)
+        self.test_f1 = torchmetrics.F1Score(num_classes=num_classes)
+
+    def get_final_activation(self):
+        # return torch.nn.Softmax(dim=1)
+        return torch.nn.Sigmoid()
 
     def configure_callbacks(self):
         callbacks = [
             LearningRateMonitor(logging_interval='epoch', log_momentum=True),
-            EarlyStopping(patience=2 * self.hparams.patience,
+            EarlyStopping(patience=3 * self.hparams.patience,
                           monitor='val_loss',
                           verbose=True,
                           mode='min'),
@@ -99,14 +107,23 @@ class Classifier(LightningModule):
         x, y = batch
         y_hat = self(x)
 
-        self.train_acc(torch.round(y_hat).int(), torch.round(y).int())
-        self.log('train_acc',
-                 self.train_acc,
-                 on_step=True,
-                 on_epoch=False,
-                 prog_bar=True)
+        predicted_class = y_hat.argmax(dim=1)
+        actual_class = y.argmax(dim=1)
 
-        return self.loss(y_hat, y)
+        self.train_acc(predicted_class, actual_class)
+        self.train_f1(predicted_class, actual_class)
+
+        loss = self.loss(y_hat, y)
+
+        self.log_dict({
+            'train_acc': self.train_acc,
+            'train_f1': self.train_f1
+        },
+                      on_step=True,
+                      on_epoch=False,
+                      prog_bar=True)
+
+        return loss
 
     def forward(self, x):
         return self.model(x)
@@ -115,37 +132,51 @@ class Classifier(LightningModule):
         x, y = batch
         y_hat = self(x)
 
-        self.valid_acc(torch.round(y_hat).int(), torch.round(y).int())
-        self.log('valid_acc',
-                 self.valid_acc,
-                 on_step=False,
-                 on_epoch=True,
-                 prog_bar=True)
+        predicted_class = y_hat.argmax(dim=1)
+        actual_class = y.argmax(dim=1)
+
+        self.valid_acc(predicted_class, actual_class)
+        self.valid_f1(predicted_class, actual_class)
 
         loss = self.loss(y_hat, y)
-        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
+
+        self.log_dict(
+            {
+                'valid_acc': self.valid_acc,
+                'valid_f1': self.valid_f1,
+                'val_loss': loss
+            },
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True)
 
     def test_step(self, batch, _batch_idx):
         x, y = batch
         y_hat = self(x)
 
-        self.test_acc(torch.round(y_hat).int(), torch.round(y).int())
-        self.log('test_acc',
-                 self.test_acc,
-                 on_step=False,
-                 on_epoch=True,
-                 prog_bar=True)
+        predicted_class = y_hat.argmax(dim=1)
+        actual_class = y.argmax(dim=1)
 
+        self.test_acc(predicted_class, actual_class)
+        self.test_f1(predicted_class, actual_class)
         loss = self.loss(y_hat, y)
-        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
+
+        self.log_dict(
+            {
+                'test_acc': self.test_acc,
+                'test_f1': self.test_f1,
+                'test_loss': loss
+            },
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True)
 
     def predict_step(self, batch, _batch_idx):
         x, y = batch
         y_hat = self(x)
-        predicted = y_hat.squeeze().argmax()
-        ground_truth = batch[1].squeeze().argmax()
-        import pdb
-        pdb.set_trace()
+        predicted = y_hat.argmax(dim=1)
+        ground_truth = batch[1].argmax(dim=1)
+
         return {"predicted": predicted, "ground_truth": ground_truth}
 
     def configure_optimizers(self):
