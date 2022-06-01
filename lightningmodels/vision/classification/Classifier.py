@@ -1,13 +1,13 @@
 import torch
 from pytorch_lightning import LightningModule
-from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping, ModelCheckpoint, DeviceStatsMonitor
+from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping, ModelCheckpoint, DeviceStatsMonitor, BasePredictionWriter
 from pytorch_lightning.utilities.exceptions import MisconfigurationException
 import monai
 import torchmetrics
 from pytorch_lightning.utilities.cli import MODEL_REGISTRY
 from typing import List, Any
-from pytorch_lightning.callbacks import BasePredictionWriter
 import os
+from functools import partial
 
 __all__ = ["Classifier"]
 
@@ -47,9 +47,11 @@ class Classifier(LightningModule):
                  in_channels: int,
                  patience: int = 3,
                  learning_rate: float = 5e-3,
-                 min_learning_rate: float = 5e-4,
+                 min_learning_rate: float = 5e-5,
                  weight_decay: float = 0.0,
-                 dataset_name: str = None):
+                 dataset_name: str = None,
+                 use_softmax: bool = False,
+                 sigmoid_epochs: int = 6):
         super().__init__()
         self.save_hyperparameters()
 
@@ -57,22 +59,14 @@ class Classifier(LightningModule):
             torch.nn.InstanceNorm2d(self.hparams.in_channels,
                                     track_running_stats=True),
             torch.nn.Conv2d(self.hparams.in_channels, 3, (1, 1)),
-            torch.nn.InstanceNorm2d(3), self.get_model(),
-            self.get_final_activation())
+            torch.nn.InstanceNorm2d(3), self.get_model())
 
         self.loss = torch.nn.BCELoss()
 
-        self.train_acc = torchmetrics.Accuracy(num_classes=num_classes)
-        self.valid_acc = torchmetrics.Accuracy(num_classes=num_classes)
-        self.test_acc = torchmetrics.Accuracy(num_classes=num_classes)
-
-        self.train_f1 = torchmetrics.F1Score(num_classes=num_classes)
         self.valid_f1 = torchmetrics.F1Score(num_classes=num_classes)
         self.test_f1 = torchmetrics.F1Score(num_classes=num_classes)
 
-    def get_final_activation(self):
-        # return torch.nn.Softmax(dim=1)
-        return torch.nn.Sigmoid()
+        self.final_activation = torch.sigmoid
 
     def configure_callbacks(self):
         callbacks = [
@@ -105,28 +99,21 @@ class Classifier(LightningModule):
 
     def training_step(self, batch, _batch_idx):
         x, y = batch
+
+        if self.hparams.use_softmax and self.current_epoch >= self.hparams.sigmoid_epochs and self.final_activation == torch.sigmoid:
+            self.final_activation = partial(torch.softmax, dim=1)
+            print("Switching to Softmax Activation")
+
         y_hat = self(x)
 
-        predicted_class = y_hat.argmax(dim=1)
-        actual_class = y.argmax(dim=1)
-
-        self.train_acc(predicted_class, actual_class)
-        self.train_f1(predicted_class, actual_class)
-
         loss = self.loss(y_hat, y)
-
-        self.log_dict({
-            'train_acc': self.train_acc,
-            'train_f1': self.train_f1
-        },
-                      on_step=True,
-                      on_epoch=False,
-                      prog_bar=True)
 
         return loss
 
     def forward(self, x):
-        return self.model(x)
+        y_hat = self.model(x)
+        y_hat = self.final_activation(y_hat)
+        return y_hat
 
     def validation_step(self, batch, _batch_idx):
         x, y = batch
@@ -135,20 +122,17 @@ class Classifier(LightningModule):
         predicted_class = y_hat.argmax(dim=1)
         actual_class = y.argmax(dim=1)
 
-        self.valid_acc(predicted_class, actual_class)
         self.valid_f1(predicted_class, actual_class)
 
         loss = self.loss(y_hat, y)
 
-        self.log_dict(
-            {
-                'valid_acc': self.valid_acc,
-                'valid_f1': self.valid_f1,
-                'val_loss': loss
-            },
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True)
+        self.log_dict({
+            'valid_f1': self.valid_f1,
+            'val_loss': loss
+        },
+                      on_step=False,
+                      on_epoch=True,
+                      prog_bar=True)
 
     def test_step(self, batch, _batch_idx):
         x, y = batch
@@ -157,19 +141,16 @@ class Classifier(LightningModule):
         predicted_class = y_hat.argmax(dim=1)
         actual_class = y.argmax(dim=1)
 
-        self.test_acc(predicted_class, actual_class)
         self.test_f1(predicted_class, actual_class)
         loss = self.loss(y_hat, y)
 
-        self.log_dict(
-            {
-                'test_acc': self.test_acc,
-                'test_f1': self.test_f1,
-                'test_loss': loss
-            },
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True)
+        self.log_dict({
+            'test_f1': self.test_f1,
+            'test_loss': loss
+        },
+                      on_step=False,
+                      on_epoch=True,
+                      prog_bar=True)
 
     def predict_step(self, batch, _batch_idx):
         x, y = batch
