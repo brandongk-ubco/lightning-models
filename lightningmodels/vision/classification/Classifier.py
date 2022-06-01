@@ -50,7 +50,7 @@ class Classifier(LightningModule):
                  min_learning_rate: float = 5e-5,
                  weight_decay: float = 0.0,
                  dataset_name: str = None,
-                 use_softmax: bool = False,
+                 use_softmax: bool = True,
                  sigmoid_epochs: int = 6):
         super().__init__()
         self.save_hyperparameters()
