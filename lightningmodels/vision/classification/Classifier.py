@@ -100,9 +100,12 @@ class Classifier(LightningModule):
     def training_step(self, batch, _batch_idx):
         x, y = batch
 
-        if self.hparams.use_softmax and self.current_epoch >= self.hparams.sigmoid_epochs and self.final_activation == torch.sigmoid:
-            self.final_activation = partial(torch.softmax, dim=1)
-            print("Switching to Softmax Activation")
+        if _batch_idx == 0 and self.hparams.use_softmax and self.final_activation == torch.sigmoid:
+            current_lr = self.lr_schedulers().optimizer.param_groups[0]["lr"]
+            initial_lr = self.hparams.learning_rate
+            if current_lr < initial_lr:
+                self.final_activation = partial(torch.softmax, dim=1)
+                print("Switching to Softmax Activation")
 
         y_hat = self(x)
 
