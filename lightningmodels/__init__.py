@@ -4,6 +4,17 @@ from pytorch_lightning.utilities.cli import LightningCLI
 import sys
 from functools import partial
 from pytorch_lightning.utilities.cli import LightningCLI, DATAMODULE_REGISTRY, MODEL_REGISTRY
+import os
+import json
+import importlib
+
+modules_file = os.path.join(os.getcwd(), "modules.json")
+if os.path.exists(modules_file):
+    with open(modules_file, "r") as jsonfile:
+        modules = json.load(jsonfile)
+    if "models" in modules:
+        for module in modules["models"]:
+            importlib.import_module(module)
 
 
 class MyLightningCLI(LightningCLI):
