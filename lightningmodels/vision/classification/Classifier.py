@@ -7,6 +7,7 @@ import torchmetrics
 from pytorch_lightning.utilities.cli import MODEL_REGISTRY
 from typing import List, Any
 import os
+from torch.optim.lr_scheduler import LinearLR, ReduceLROnPlateau
 from functools import partial
 
 __all__ = ["Classifier"]
@@ -45,13 +46,13 @@ class Classifier(LightningModule):
                  num_classes: int,
                  classes: List,
                  in_channels: int,
-                 patience: int = 3,
-                 learning_rate: float = 5e-3,
-                 min_learning_rate: float = 5e-5,
-                 weight_decay: float = 0.0,
-                 dataset_name: str = None,
-                 use_softmax: bool = True,
-                 sigmoid_epochs: int = 6):
+                 patience: int = 5,
+                 momentum: float = 0.9,
+                 learning_rate: float = 8e-4,
+                 min_learning_rate: float = 1e-7,
+                 learning_rate_warmup_epochs=10,
+                 weight_decay: float = 0.000125,
+                 dataset_name: str = None):
         super().__init__()
         self.save_hyperparameters()
 
@@ -61,12 +62,23 @@ class Classifier(LightningModule):
             torch.nn.Conv2d(self.hparams.in_channels, 3, (1, 1)),
             torch.nn.InstanceNorm2d(3), self.get_model())
 
-        self.loss = torch.nn.BCELoss()
+        # if self.hparams.final_activation == "softmax":
+        #     self.final_activation = partial(torch.softmax, dim=-1)
+        # elif self.hparams.final_activation == "sigmoid":
+        #     self.final_activation = torch.sigmoid
+        # elif self.hparams.final_activation == "identity":
+        #     self.final_activation = None
+        # else:
+        #     raise ValueError(
+        #         "Must Specify Activation Function from {softmax, sigmoid, identity}"
+        #     )
 
-        self.valid_f1 = torchmetrics.F1Score(num_classes=num_classes)
-        self.test_f1 = torchmetrics.F1Score(num_classes=num_classes)
+        self.loss = torch.nn.CrossEntropyLoss()
 
-        self.final_activation = torch.sigmoid
+        self.valid_f1 = torchmetrics.F1Score(
+            num_classes=self.hparams.num_classes)
+        self.test_f1 = torchmetrics.F1Score(
+            num_classes=self.hparams.num_classes)
 
     def configure_callbacks(self):
         callbacks = [
@@ -94,19 +106,11 @@ class Classifier(LightningModule):
         return monai.networks.nets.EfficientNetBN(
             "efficientnet-b0",
             spatial_dims=2,
-            pretrained=True,
+            pretrained=False,
             num_classes=self.hparams.num_classes)
 
     def training_step(self, batch, _batch_idx):
         x, y = batch
-
-        if _batch_idx == 0 and self.hparams.use_softmax and self.final_activation == torch.sigmoid:
-            current_lr = self.lr_schedulers().optimizer.param_groups[0]["lr"]
-            initial_lr = self.hparams.learning_rate
-            if current_lr < initial_lr:
-                self.final_activation = partial(torch.softmax, dim=1)
-                print("Switching to Softmax Activation")
-
         y_hat = self(x)
 
         loss = self.loss(y_hat, y)
@@ -115,7 +119,6 @@ class Classifier(LightningModule):
 
     def forward(self, x):
         y_hat = self.model(x)
-        y_hat = self.final_activation(y_hat)
         return y_hat
 
     def validation_step(self, batch, _batch_idx):
@@ -164,21 +167,39 @@ class Classifier(LightningModule):
         return {"predicted": predicted, "ground_truth": ground_truth}
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(),
-                                     lr=self.hparams.learning_rate,
-                                     weight_decay=self.hparams.weight_decay)
+        optimizer = torch.optim.SGD(self.parameters(),
+                                    lr=self.hparams.learning_rate,
+                                    momentum=self.hparams.momentum,
+                                    nesterov=True,
+                                    weight_decay=self.hparams.weight_decay)
 
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        warmup_scheduler = LinearLR(
+            optimizer,
+            start_factor=self.hparams.min_learning_rate /
+            self.hparams.learning_rate,
+            end_factor=1,
+            total_iters=self.hparams.learning_rate_warmup_epochs)
+
+        reduction_scheduler = ReduceLROnPlateau(
             optimizer,
             patience=self.hparams.patience,
             min_lr=self.hparams.min_learning_rate,
             verbose=True,
             mode="min")
 
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
+        reduction_scheduler.cooldown_counter = self.hparams.learning_rate_warmup_epochs + self.hparams.patience
+
+        return [optimizer], [
+            warmup_scheduler, {
+                "scheduler": reduction_scheduler,
                 "monitor": "val_loss"
             }
-        }
+        ]
+
+        # return {
+        #     "optimizer": optimizer,
+        #     "lr_scheduler": {
+        #         "scheduler": reduction_scheduler,
+        #         "monitor": "val_loss"
+        #     }
+        # }

@@ -39,8 +39,7 @@ CLI = partial(MyLightningCLI,
               trainer_defaults={
                   "gpus": -1,
                   "deterministic": True,
-                  "max_epochs": sys.maxsize,
-                  "stochastic_weight_avg": True
+                  "max_epochs": sys.maxsize
               })
 
 usage = f"""
