@@ -78,7 +78,7 @@ class Classifier(LightningModule):
                  max_learning_rate: float = 0.1,
                  learning_rate: float = 1e-4,
                  min_learning_rate: float = 1e-7,
-                 learning_rate_warmup_epochs: int = 30,
+                 learning_rate_warmup_epochs: int = 10,
                  learning_rate_reduction_factor: float = 0.1,
                  weight_decay: float = 5e-4,
                  dataset_name: str = None,
