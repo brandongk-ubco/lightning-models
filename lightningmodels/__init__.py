@@ -1,6 +1,6 @@
 import lightningdata  # noqa: F401
+import pl_bolts  # noqa: F401
 from . import vision
-from pytorch_lightning.utilities.cli import LightningCLI
 import sys
 from functools import partial
 from pytorch_lightning.utilities.cli import LightningCLI, DATAMODULE_REGISTRY, MODEL_REGISTRY
