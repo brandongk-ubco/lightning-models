@@ -31,18 +31,18 @@ class Segmenter(LightningModule):
         self.save_hyperparameters()
 
         self.model = torch.nn.Sequential(
-            torch.nn.InstanceNorm2d(self.hparams.in_channels,
+            torch.nn.InstanceNorm2d(self.hparams["in_channels"],
                                     track_running_stats=True),
-            torch.nn.Conv2d(self.hparams.in_channels, 3, (1, 1)),
+            torch.nn.Conv2d(self.hparams["in_channels"], 3, (1, 1)),
             torch.nn.InstanceNorm2d(3), self.get_model(), torch.nn.Sigmoid())
 
-        self.train_f1 = torchmetrics.F1Score(self.hparams.num_classes + 1,
+        self.train_f1 = torchmetrics.F1Score(self.hparams["num_classes"] + 1,
                                              average="macro",
                                              mdmc_average='global')
-        self.valid_f1 = torchmetrics.F1Score(self.hparams.num_classes + 1,
+        self.valid_f1 = torchmetrics.F1Score(self.hparams["num_classes"] + 1,
                                              average="macro",
                                              mdmc_average='samplewise')
-        self.test_f1 = torchmetrics.F1Score(self.hparams.num_classes + 1,
+        self.test_f1 = torchmetrics.F1Score(self.hparams["num_classes"] + 1,
                                             average="macro",
                                             mdmc_average='samplewise')
 

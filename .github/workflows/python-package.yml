@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8]
+        python-version: [3.8]
 
     # lower timeout as this should run very quickly
     timeout-minutes: 20
@@ -57,8 +57,8 @@ jobs:
       run: |
         mypy lightningmodels
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count  --max-complexity=10 --statistics
+        flake8 . --count  --max-complexity=15 --statistics
         yapf --diff -r lightningmodels
     - name: Test with pytest
       run: |
-        python -m pytest --cov=lightningmodels --cov-branch --cov-report term-missing --cov-fail-under=50
+        python -m pytest --cov=lightningmodels --cov-branch --cov-report term-missing --cov-fail-under=20

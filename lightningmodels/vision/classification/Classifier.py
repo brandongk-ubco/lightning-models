@@ -2,13 +2,12 @@ import torch
 from pytorch_lightning import LightningModule
 from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping, ModelCheckpoint, DeviceStatsMonitor, BasePredictionWriter
 from pytorch_lightning.utilities.exceptions import MisconfigurationException
-import monai
 import torchmetrics
 from pytorch_lightning.utilities.cli import MODEL_REGISTRY
-from typing import List, Any
+from typing import List, Any, Optional, Sequence, Callable
 import os
 from bisect import bisect_right
-from torch.optim.lr_scheduler import OneCycleLR, ReduceLROnPlateau, SequentialLR
+from torch.optim.lr_scheduler import OneCycleLR, ReduceLROnPlateau, SequentialLR  # type: ignore
 from functools import partial
 import torchvision
 from torch import nn
@@ -54,8 +53,9 @@ class ClassifierPredictionWriter(BasePredictionWriter):
             f.write("batch_idx,ground_truth,predicted\n")
 
     def write_on_batch_end(self, trainer, pl_module: 'LightningModule',
-                           prediction: Any, batch_indices: List[int],
-                           batch: Any, batch_idx: int, dataloader_idx: int):
+                           prediction: Any,
+                           batch_indices: Optional[Sequence[int]], batch: Any,
+                           batch_idx: int, dataloader_idx: int):
 
         predicted = prediction["predicted"]
         ground_truth = prediction["ground_truth"]
@@ -87,28 +87,30 @@ class Classifier(LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        if self.hparams.in_channels == 3:
+        if self.hparams["in_channels"] == 3:
             self.model = self.get_model()
         else:
             self.model = torch.nn.Sequential(
-                torch.nn.Conv2d(self.hparams.in_channels, 3, (1, 1)),
+                torch.nn.Conv2d(self.hparams["in_channels"], 3, (1, 1)),
                 self.get_model())
 
-        if self.hparams.final_activation == "softmax":
+        self.loss: Optional[torch.nn.Module] = None
+        self.final_activation: Optional[Callable[[Any], torch.Tensor]] = None
+        if self.hparams["final_activation"] == "softmax":
             self.loss = torch.nn.CrossEntropyLoss()
             self.final_activation = None
-        elif self.hparams.final_activation == "normalized":
+        elif self.hparams["final_activation"] == "normalized":
             self.loss = torch.nn.MSELoss()
             self.final_activation = partial(torch.nn.functional.normalize,
                                             dim=1)
-        elif self.hparams.final_activation == "normalized_sigmoid":
+        elif self.hparams["final_activation"] == "normalized_sigmoid":
             self.loss = torch.nn.BCELoss()
             self.final_activation = lambda input: torch.sigmoid(
                 torch.nn.functional.normalize(input, dim=1))
-        elif self.hparams.final_activation == "sigmoid":
+        elif self.hparams["final_activation"] == "sigmoid":
             self.loss = torch.nn.BCELoss()
             self.final_activation = torch.sigmoid
-        elif self.hparams.final_activation == "identity":
+        elif self.hparams["final_activation"] == "identity":
             self.loss = torch.nn.MSELoss()
             self.final_activation = None
         else:
@@ -117,14 +119,14 @@ class Classifier(LightningModule):
             )
 
         self.valid_f1 = torchmetrics.F1Score(
-            num_classes=self.hparams.num_classes)
+            num_classes=self.hparams["num_classes"])
         self.test_f1 = torchmetrics.F1Score(
-            num_classes=self.hparams.num_classes)
+            num_classes=self.hparams["num_classes"])
 
     def configure_callbacks(self):
         callbacks = [
             LearningRateMonitor(logging_interval='epoch', log_momentum=True),
-            EarlyStopping(patience=3 * self.hparams.patience,
+            EarlyStopping(patience=3 * self.hparams["patience"],
                           monitor='val_loss',
                           verbose=True,
                           mode='min'),
@@ -134,7 +136,7 @@ class Classifier(LightningModule):
                             filename='{epoch}-{val_loss:.6f}'),
             ClassifierPredictionWriter(os.getcwd(),
                                        write_interval="batch",
-                                       classes=self.hparams.classes)
+                                       classes=self.hparams["classes"])
         ]
 
         try:
@@ -144,8 +146,9 @@ class Classifier(LightningModule):
         return callbacks
 
     def get_model(self):
-        model = torchvision.models.resnet18(pretrained=self.hparams.pretrained)
-        model.fc = nn.Linear(model.fc.in_features, self.hparams.num_classes)
+        model = torchvision.models.resnet18(
+            pretrained=self.hparams["pretrained"])
+        model.fc = nn.Linear(model.fc.in_features, self.hparams["num_classes"])
         return model
 
     def training_step(self, batch, _batch_idx):

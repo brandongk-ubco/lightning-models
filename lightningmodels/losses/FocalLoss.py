@@ -72,7 +72,7 @@ def focal_loss(output: torch.Tensor,
     if reduction == "batchwise_mean":
         loss = loss.sum(0)
 
-    return loss
+    return torch.Tensor(loss)
 
 
 class FocalLoss(smp.losses.FocalLoss):
@@ -113,7 +113,7 @@ class FocalLoss(smp.losses.FocalLoss):
         elif self.mode == smp.losses.constants.MULTICLASS_MODE:
 
             num_classes = y_pred.size(1)
-            loss = 0
+            loss = torch.tensor(0, dtype=y_true.dtype).to(y_true.device)
 
             # Filter anchors with -1 label from loss computation
             if self.ignore_index is not None:

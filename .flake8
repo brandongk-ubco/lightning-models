@@ -1,4 +1,4 @@
 [flake8]
 ignore = E251 W504 E126 E712
 exclude = .git,__pycache__,docs/source/conf.py,old,build,dist,fixNvPe.py
-max-line-length=127
+max-line-length=150
