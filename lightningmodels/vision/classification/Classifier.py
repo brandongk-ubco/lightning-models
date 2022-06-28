@@ -76,9 +76,9 @@ class Classifier(LightningModule):
                  patience: int = 5,
                  momentum: float = 0.9,
                  max_learning_rate: float = 0.1,
-                 learning_rate: float = 1e-4,
-                 min_learning_rate: float = 1e-7,
-                 learning_rate_warmup_epochs: int = 10,
+                 learning_rate: float = 1e-3,
+                 min_learning_rate: float = 1e-5,
+                 learning_rate_warmup_epochs: int = 30,
                  learning_rate_reduction_factor: float = 0.1,
                  weight_decay: float = 5e-4,
                  dataset_name: str = None,
@@ -153,11 +153,6 @@ class Classifier(LightningModule):
                                 bias=False)
         model.maxpool = nn.Identity()
         return model
-        # return monai.networks.nets.EfficientNetBN(
-        #     "efficientnet-b3",
-        #     spatial_dims=2,
-        #     pretrained=False,
-        #     num_classes=self.hparams.num_classes)
 
     def training_step(self, batch, _batch_idx):
         x, y = batch
@@ -228,9 +223,10 @@ class Classifier(LightningModule):
 
         warmup_scheduler = OneCycleLR(
             optimizer,
-            div_factor=self.hparams.learning_rate /
+            div_factor=self.hparams.max_learning_rate /
             self.hparams.min_learning_rate,
-            final_div_factor=1,
+            final_div_factor=self.hparams.min_learning_rate /
+            self.hparams.learning_rate,
             max_lr=self.hparams.max_learning_rate,
             total_steps=self.hparams.learning_rate_warmup_epochs)
 
