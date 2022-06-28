@@ -82,6 +82,7 @@ class Classifier(LightningModule):
                  learning_rate_reduction_factor: float = 0.1,
                  weight_decay: float = 5e-4,
                  dataset_name: str = None,
+                 pretrained: bool = True,
                  final_activation: str = "sigmoid"):
         super().__init__()
         self.save_hyperparameters()
@@ -143,15 +144,8 @@ class Classifier(LightningModule):
         return callbacks
 
     def get_model(self):
-        model = torchvision.models.resnet18(
-            pretrained=False, num_classes=self.hparams.num_classes)
-        model.conv1 = nn.Conv2d(3,
-                                64,
-                                kernel_size=(3, 3),
-                                stride=(1, 1),
-                                padding=(1, 1),
-                                bias=False)
-        model.maxpool = nn.Identity()
+        model = torchvision.models.resnet18(pretrained=self.hparams.pretrained)
+        model.fc = nn.Linear(model.fc.in_features, self.hparams.num_classes)
         return model
 
     def training_step(self, batch, _batch_idx):
